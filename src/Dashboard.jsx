@@ -1,24 +1,37 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { nhost } from "./nhost";
 
 function Dashboard() {
   const [transcript, setTranscript] = useState("");
   const [recording, setRecording] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState("");
+
+  const mediaRecorderRef = useRef(null);
+  const socketRef = useRef(null);
+  const streamRef = useRef(null);
 
   const startRecording = async () => {
     try {
-      setRecording(true);
+      setPermissionStatus("Requesting microphone access...");
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
       });
+
+      setPermissionStatus("Microphone access granted");
+
+      streamRef.current = stream;
+      setRecording(true);
 
       const socket = new WebSocket(
         "wss://api.deepgram.com/v1/listen",
         ["token", import.meta.env.VITE_DEEPGRAM_API_KEY]
       );
 
+      socketRef.current = socket;
+
       const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
 
       socket.onopen = () => {
         console.log("Deepgram Connected");
@@ -41,7 +54,7 @@ function Dashboard() {
         const text =
           data.channel?.alternatives?.[0]?.transcript || "";
 
-        if (text.trim() !== "") {
+        if (text.trim()) {
           setTranscript((prev) => prev + " " + text);
         }
       };
@@ -55,13 +68,48 @@ function Dashboard() {
       };
     } catch (error) {
       console.error(error);
-      alert("Microphone access denied");
+
+      setPermissionStatus(
+        "Microphone access denied. Please allow microphone permission."
+      );
+
+      alert(
+        "Microphone access denied. Please allow microphone permission and try again."
+      );
+    }
+  };
+
+  const stopRecording = () => {
+    try {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+      }
+
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+
+      if (streamRef.current) {
+        streamRef.current
+          .getTracks()
+          .forEach((track) => track.stop());
+      }
+
+      setRecording(false);
+      setPermissionStatus("Recording stopped");
+    } catch (error) {
+      console.error(error);
     }
   };
 
   const logout = async () => {
-    await nhost.auth.signOut();
-    window.location.href = "/";
+    try {
+      stopRecording();
+      await nhost.auth.signOut();
+      window.location.href = "/";
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
@@ -86,6 +134,19 @@ function Dashboard() {
         {recording ? "Recording..." : "Start Recording"}
       </button>
 
+      {recording && (
+        <button
+          onClick={stopRecording}
+          style={{
+            padding: "10px 20px",
+            marginRight: "10px",
+            cursor: "pointer",
+          }}
+        >
+          Stop Recording
+        </button>
+      )}
+
       <button
         onClick={logout}
         style={{
@@ -95,6 +156,19 @@ function Dashboard() {
       >
         Logout
       </button>
+
+      {permissionStatus && (
+        <div
+          style={{
+            marginTop: "15px",
+            padding: "10px",
+            borderRadius: "6px",
+            background: "#f5f5f5",
+          }}
+        >
+          {permissionStatus}
+        </div>
+      )}
 
       <div
         style={{
@@ -110,7 +184,10 @@ function Dashboard() {
         {transcript ? (
           <p>{transcript}</p>
         ) : (
-          <p>Click "Start Recording" and begin speaking...</p>
+          <p>
+            Click <strong>Start Recording</strong> and allow microphone
+            access when prompted.
+          </p>
         )}
       </div>
     </div>
