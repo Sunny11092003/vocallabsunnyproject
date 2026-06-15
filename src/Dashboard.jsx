@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { nhost } from "./nhost";
 
 function Dashboard() {
@@ -10,6 +10,31 @@ function Dashboard() {
   const socketRef = useRef(null);
   const streamRef = useRef(null);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const user = nhost.auth.getUser();
+
+      console.log("USER:", user);
+      console.log("AUTH:", nhost.auth.isAuthenticated());
+
+      if (!user) {
+        window.location.href = "/";
+      }
+    }, 1000);
+
+    const handleUnload = () => {
+      localStorage.clear();
+      sessionStorage.clear();
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, []);
+
   const startRecording = async () => {
     try {
       setPermissionStatus("Requesting microphone access...");
@@ -18,9 +43,9 @@ function Dashboard() {
         audio: true,
       });
 
-      setPermissionStatus("Microphone access granted");
-
       streamRef.current = stream;
+
+      setPermissionStatus("Microphone access granted");
       setRecording(true);
 
       const socket = new WebSocket(
@@ -34,8 +59,6 @@ function Dashboard() {
       mediaRecorderRef.current = mediaRecorder;
 
       socket.onopen = () => {
-        console.log("Deepgram Connected");
-
         mediaRecorder.addEventListener("dataavailable", (event) => {
           if (
             event.data.size > 0 &&
@@ -58,59 +81,51 @@ function Dashboard() {
           setTranscript((prev) => prev + " " + text);
         }
       };
-
-      socket.onerror = (error) => {
-        console.error("WebSocket Error:", error);
-      };
-
-      socket.onclose = () => {
-        console.log("Deepgram Connection Closed");
-      };
     } catch (error) {
       console.error(error);
 
       setPermissionStatus(
-        "Microphone access denied. Please allow microphone permission."
+        "Microphone permission denied."
       );
 
-      alert(
-        "Microphone access denied. Please allow microphone permission and try again."
-      );
+      setRecording(false);
     }
   };
 
   const stopRecording = () => {
-    try {
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-      }
-
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-
-      if (streamRef.current) {
-        streamRef.current
-          .getTracks()
-          .forEach((track) => track.stop());
-      }
-
-      setRecording(false);
-      setPermissionStatus("Recording stopped");
-    } catch (error) {
-      console.error(error);
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
     }
+
+    if (socketRef.current) {
+      socketRef.current.close();
+    }
+
+    if (streamRef.current) {
+      streamRef.current
+        .getTracks()
+        .forEach((track) => track.stop());
+    }
+
+    setRecording(false);
   };
 
   const logout = async () => {
     try {
       stopRecording();
+
       await nhost.auth.signOut();
+
+      localStorage.clear();
+      sessionStorage.clear();
+
       window.location.href = "/";
     } catch (error) {
       console.error(error);
     }
   };
+
+  const user = nhost.auth.getUser();
 
   return (
     <div
@@ -122,13 +137,16 @@ function Dashboard() {
     >
       <h1>Live Speech-to-Text Dashboard</h1>
 
+      <p>
+        Logged in as: <strong>{user?.email}</strong>
+      </p>
+
       <button
         onClick={startRecording}
         disabled={recording}
         style={{
           padding: "10px 20px",
           marginRight: "10px",
-          cursor: "pointer",
         }}
       >
         {recording ? "Recording..." : "Start Recording"}
@@ -140,7 +158,6 @@ function Dashboard() {
           style={{
             padding: "10px 20px",
             marginRight: "10px",
-            cursor: "pointer",
           }}
         >
           Stop Recording
@@ -151,24 +168,14 @@ function Dashboard() {
         onClick={logout}
         style={{
           padding: "10px 20px",
-          cursor: "pointer",
         }}
       >
         Logout
       </button>
 
-      {permissionStatus && (
-        <div
-          style={{
-            marginTop: "15px",
-            padding: "10px",
-            borderRadius: "6px",
-            background: "#f5f5f5",
-          }}
-        >
-          {permissionStatus}
-        </div>
-      )}
+      <div style={{ marginTop: "15px" }}>
+        {permissionStatus}
+      </div>
 
       <div
         style={{
@@ -184,10 +191,7 @@ function Dashboard() {
         {transcript ? (
           <p>{transcript}</p>
         ) : (
-          <p>
-            Click <strong>Start Recording</strong> and allow microphone
-            access when prompted.
-          </p>
+          <p>Click Start Recording and begin speaking...</p>
         )}
       </div>
     </div>

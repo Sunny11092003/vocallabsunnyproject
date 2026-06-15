@@ -14,29 +14,6 @@ function Login() {
     }
   }, []);
 
-  const signup = async () => {
-    try {
-      setLoading(true);
-
-      const { error } = await nhost.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
-
-      alert("Signup Successful");
-    } catch (error) {
-      console.error(error);
-      alert("Signup Failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const login = async () => {
     try {
       setLoading(true);
@@ -94,54 +71,51 @@ function Login() {
         <p>Password: <b>vocallabs123</b></p>
       </div>
 
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Email"
-        style={{
-          width: "100%",
-          padding: "12px",
-          marginBottom: "10px",
-          boxSizing: "border-box",
-        }}
-      />
-
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password"
-        style={{
-          width: "100%",
-          padding: "12px",
-          marginBottom: "10px",
-          boxSizing: "border-box",
-        }}
-      />
-
-      <button
-        onClick={signup}
-        disabled={loading}
-        style={{
-          width: "100%",
-          padding: "12px",
-          marginBottom: "10px",
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          login();
         }}
       >
-        Sign Up
-      </button>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          required
+          style={{
+            width: "100%",
+            padding: "12px",
+            marginBottom: "10px",
+            boxSizing: "border-box",
+          }}
+        />
 
-      <button
-        onClick={login}
-        disabled={loading}
-        style={{
-          width: "100%",
-          padding: "12px",
-        }}
-      >
-        Login
-      </button>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          required
+          style={{
+            width: "100%",
+            padding: "12px",
+            marginBottom: "10px",
+            boxSizing: "border-box",
+          }}
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "12px",
+          }}
+        >
+          {loading ? "Please Wait..." : "Login"}
+        </button>
+      </form>
     </div>
   );
 }
