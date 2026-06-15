@@ -18,6 +18,14 @@ function Login() {
     try {
       setLoading(true);
 
+      // Already logged in
+      const currentUser = nhost.auth.getUser();
+
+      if (currentUser) {
+        window.location.href = "/dashboard";
+        return;
+      }
+
       const { session, error } = await nhost.auth.signIn({
         email,
         password,
@@ -26,6 +34,11 @@ function Login() {
       console.log("LOGIN RESULT:", { session, error });
 
       if (error) {
+        if (error.error === "already-signed-in") {
+          window.location.href = "/dashboard";
+          return;
+        }
+
         alert(error.message);
         return;
       }
@@ -111,6 +124,11 @@ function Login() {
           style={{
             width: "100%",
             padding: "12px",
+            backgroundColor: "#2196F3",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
           }}
         >
           {loading ? "Please Wait..." : "Login"}
