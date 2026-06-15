@@ -35,73 +35,83 @@ function Dashboard() {
     };
   }, []);
 
-const startRecording = async () => {
-  try {
-    setPermissionStatus("Requesting microphone access...");
+  const startRecording = async () => {
+    try {
+      setPermissionStatus("Requesting microphone access...");
 
-    // Explicitly request microphone permission
-    const permissionStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-    });
-
-    // Stop temporary stream after permission is granted
-    permissionStream.getTracks().forEach((track) => track.stop());
-
-    setPermissionStatus("Microphone access granted");
-
-    // Start actual recording stream
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-    });
-
-    streamRef.current = stream;
-
-    setRecording(true);
-
-    const socket = new WebSocket(
-      "wss://api.deepgram.com/v1/listen",
-      ["token", import.meta.env.VITE_DEEPGRAM_API_KEY]
-    );
-
-    socketRef.current = socket;
-
-    const mediaRecorder = new MediaRecorder(stream);
-    mediaRecorderRef.current = mediaRecorder;
-
-    socket.onopen = () => {
-      mediaRecorder.addEventListener("dataavailable", (event) => {
-        if (
-          event.data.size > 0 &&
-          socket.readyState === WebSocket.OPEN
-        ) {
-          socket.send(event.data);
-        }
+      // Mobile/Desktop permission popup
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
 
-      mediaRecorder.start(250);
-    };
+      streamRef.current = stream;
 
-    socket.onmessage = (message) => {
-      const data = JSON.parse(message.data);
+      setPermissionStatus("Microphone access granted");
+      setRecording(true);
 
-      const text =
-        data.channel?.alternatives?.[0]?.transcript || "";
+      const socket = new WebSocket(
+        "wss://api.deepgram.com/v1/listen",
+        ["token", import.meta.env.VITE_DEEPGRAM_API_KEY]
+      );
 
-      if (text.trim()) {
-        setTranscript((prev) => prev + " " + text);
+      socketRef.current = socket;
+
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      socket.onopen = () => {
+        console.log("Deepgram Connected");
+
+        mediaRecorder.addEventListener("dataavailable", (event) => {
+          if (
+            event.data.size > 0 &&
+            socket.readyState === WebSocket.OPEN
+          ) {
+            socket.send(event.data);
+          }
+        });
+
+        mediaRecorder.start(250);
+      };
+
+      socket.onmessage = (message) => {
+        const data = JSON.parse(message.data);
+
+        const text =
+          data.channel?.alternatives?.[0]?.transcript || "";
+
+        if (text.trim()) {
+          setTranscript((prev) => prev + " " + text);
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error("WebSocket Error:", error);
+      };
+
+      socket.onclose = () => {
+        console.log("Deepgram Connection Closed");
+      };
+    } catch (error) {
+      console.error(error);
+
+      if (
+        error.name === "NotAllowedError" ||
+        error.name === "PermissionDeniedError"
+      ) {
+        alert(
+          "Please allow microphone permission to use Speech-to-Text."
+        );
       }
-    };
-  } catch (error) {
-    console.error(error);
 
-    alert(
-      "Please allow microphone permission to use speech-to-text."
-    );
-
-    setPermissionStatus("Microphone permission denied.");
-    setRecording(false);
-  }
-};
+      setPermissionStatus("Microphone permission denied.");
+      setRecording(false);
+    }
+  };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current) {
@@ -119,6 +129,7 @@ const startRecording = async () => {
     }
 
     setRecording(false);
+    setPermissionStatus("Recording stopped");
   };
 
   const logout = async () => {
