@@ -4,17 +4,18 @@ import { nhost } from "./nhost";
 function Login() {
   const [email, setEmail] = useState("vocallabs@gmail.com");
   const [password, setPassword] = useState("vocallabs123");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const user = nhost.auth.getUser();
-
-    if (user) {
+    if (nhost.auth.isAuthenticated()) {
       window.location.href = "/dashboard";
     }
   }, []);
 
   const signup = async () => {
     try {
+      setLoading(true);
+
       const { error } = await nhost.auth.signUp({
         email,
         password,
@@ -29,14 +30,16 @@ function Login() {
     } catch (err) {
       console.error(err);
       alert("Signup Failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   const login = async () => {
     try {
-      const currentUser = nhost.auth.getUser();
+      setLoading(true);
 
-      if (currentUser) {
+      if (nhost.auth.isAuthenticated()) {
         window.location.href = "/dashboard";
         return;
       }
@@ -47,11 +50,6 @@ function Login() {
       });
 
       if (error) {
-        if (error.error === "already-signed-in") {
-          window.location.href = "/dashboard";
-          return;
-        }
-
         alert(error.message);
         return;
       }
@@ -60,6 +58,8 @@ function Login() {
     } catch (err) {
       console.error(err);
       alert("Login Failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,11 +90,11 @@ function Login() {
       >
         <strong>Demo Credentials</strong>
 
-        <p style={{ margin: "8px 0" }}>
+        <p>
           Email: <b>vocallabs@gmail.com</b>
         </p>
 
-        <p style={{ margin: "8px 0" }}>
+        <p>
           Password: <b>vocallabs123</b>
         </p>
       </div>
@@ -131,6 +131,7 @@ function Login() {
 
       <button
         onClick={signup}
+        disabled={loading}
         style={{
           width: "100%",
           padding: "12px",
@@ -142,11 +143,12 @@ function Login() {
           cursor: "pointer",
         }}
       >
-        Sign Up
+        {loading ? "Please Wait..." : "Sign Up"}
       </button>
 
       <button
         onClick={login}
+        disabled={loading}
         style={{
           width: "100%",
           padding: "12px",
@@ -157,7 +159,7 @@ function Login() {
           cursor: "pointer",
         }}
       >
-        Login
+        {loading ? "Please Wait..." : "Login"}
       </button>
     </div>
   );
