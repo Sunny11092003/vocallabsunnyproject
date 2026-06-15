@@ -1,19 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { nhost } from "./nhost";
 
 function Dashboard() {
   const [transcript, setTranscript] = useState("");
   const [recording, setRecording] = useState(false);
-
-  const mediaRecorderRef = useRef(null);
-  const socketRef = useRef(null);
-  const streamRef = useRef(null);
-
-  useEffect(() => {
-    if (!nhost.auth.isAuthenticated()) {
-      window.location.href = "/";
-    }
-  }, []);
 
   const startRecording = async () => {
     try {
@@ -23,18 +13,12 @@ function Dashboard() {
         audio: true,
       });
 
-      streamRef.current = stream;
-
       const socket = new WebSocket(
         "wss://api.deepgram.com/v1/listen",
         ["token", import.meta.env.VITE_DEEPGRAM_API_KEY]
       );
 
-      socketRef.current = socket;
-
       const mediaRecorder = new MediaRecorder(stream);
-
-      mediaRecorderRef.current = mediaRecorder;
 
       socket.onopen = () => {
         console.log("Deepgram Connected");
@@ -57,60 +41,28 @@ function Dashboard() {
         const text =
           data.channel?.alternatives?.[0]?.transcript || "";
 
-        if (text.trim()) {
+        if (text.trim() !== "") {
           setTranscript((prev) => prev + " " + text);
         }
       };
 
       socket.onerror = (error) => {
-        console.error("Deepgram Error:", error);
+        console.error("WebSocket Error:", error);
       };
 
       socket.onclose = () => {
-        console.log("Deepgram Closed");
+        console.log("Deepgram Connection Closed");
       };
     } catch (error) {
       console.error(error);
       alert("Microphone access denied");
-      setRecording(false);
-    }
-  };
-
-  const stopRecording = () => {
-    try {
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-      }
-
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-
-      if (streamRef.current) {
-        streamRef.current
-          .getTracks()
-          .forEach((track) => track.stop());
-      }
-
-      setRecording(false);
-    } catch (error) {
-      console.error(error);
     }
   };
 
   const logout = async () => {
-    try {
-      stopRecording();
-
-      await nhost.auth.signOut();
-
-      window.location.href = "/";
-    } catch (error) {
-      console.error(error);
-    }
+    await nhost.auth.signOut();
+    window.location.href = "/";
   };
-
-  const user = nhost.auth.getUser();
 
   return (
     <div
@@ -121,11 +73,6 @@ function Dashboard() {
       }}
     >
       <h1>Live Speech-to-Text Dashboard</h1>
-
-      <p>
-        Logged in as:{" "}
-        <strong>{user?.email || "User"}</strong>
-      </p>
 
       <button
         onClick={startRecording}
@@ -138,19 +85,6 @@ function Dashboard() {
       >
         {recording ? "Recording..." : "Start Recording"}
       </button>
-
-      {recording && (
-        <button
-          onClick={stopRecording}
-          style={{
-            padding: "10px 20px",
-            marginRight: "10px",
-            cursor: "pointer",
-          }}
-        >
-          Stop Recording
-        </button>
-      )}
 
       <button
         onClick={logout}
@@ -176,7 +110,7 @@ function Dashboard() {
         {transcript ? (
           <p>{transcript}</p>
         ) : (
-          <p>Click Start Recording and begin speaking...</p>
+          <p>Click "Start Recording" and begin speaking...</p>
         )}
       </div>
     </div>
