@@ -1,59 +1,117 @@
 import { useState } from "react";
+import { nhost } from "./nhost";
 
 function Dashboard() {
   const [transcript, setTranscript] = useState("");
+  const [recording, setRecording] = useState(false);
 
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-    });
+    try {
+      setRecording(true);
 
-    const mediaRecorder = new MediaRecorder(stream);
-
-    const socket = new WebSocket(
-      "wss://api.deepgram.com/v1/listen",
-      ["token", import.meta.env.VITE_DEEPGRAM_API_KEY]
-    );
-
-    socket.onopen = () => {
-      mediaRecorder.addEventListener("dataavailable", (event) => {
-        if (event.data.size > 0 && socket.readyState === 1) {
-          socket.send(event.data);
-        }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
       });
 
-      mediaRecorder.start(250);
-    };
+      const socket = new WebSocket(
+        "wss://api.deepgram.com/v1/listen",
+        ["token", import.meta.env.VITE_DEEPGRAM_API_KEY]
+      );
 
-    socket.onmessage = (message) => {
-      const received = JSON.parse(message.data);
+      const mediaRecorder = new MediaRecorder(stream);
 
-      const text =
-        received.channel?.alternatives?.[0]?.transcript;
+      socket.onopen = () => {
+        console.log("Deepgram Connected");
 
-      if (text) {
-        setTranscript((prev) => prev + " " + text);
-      }
-    };
+        mediaRecorder.addEventListener("dataavailable", (event) => {
+          if (
+            event.data.size > 0 &&
+            socket.readyState === WebSocket.OPEN
+          ) {
+            socket.send(event.data);
+          }
+        });
+
+        mediaRecorder.start(250);
+      };
+
+      socket.onmessage = (message) => {
+        const data = JSON.parse(message.data);
+
+        const text =
+          data.channel?.alternatives?.[0]?.transcript || "";
+
+        if (text.trim() !== "") {
+          setTranscript((prev) => prev + " " + text);
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error("WebSocket Error:", error);
+      };
+
+      socket.onclose = () => {
+        console.log("Deepgram Connection Closed");
+      };
+    } catch (error) {
+      console.error(error);
+      alert("Microphone access denied");
+    }
+  };
+
+  const logout = async () => {
+    await nhost.auth.signOut();
+    window.location.href = "/";
   };
 
   return (
-    <div style={{ padding: "30px" }}>
-      <h1>Live Speech To Text Dashboard</h1>
+    <div
+      style={{
+        padding: "30px",
+        maxWidth: "900px",
+        margin: "0 auto",
+      }}
+    >
+      <h1>Live Speech-to-Text Dashboard</h1>
 
-      <button onClick={startRecording}>
-        Start Recording
+      <button
+        onClick={startRecording}
+        disabled={recording}
+        style={{
+          padding: "10px 20px",
+          marginRight: "10px",
+          cursor: "pointer",
+        }}
+      >
+        {recording ? "Recording..." : "Start Recording"}
+      </button>
+
+      <button
+        onClick={logout}
+        style={{
+          padding: "10px 20px",
+          cursor: "pointer",
+        }}
+      >
+        Logout
       </button>
 
       <div
         style={{
-          marginTop: "20px",
-          border: "1px solid gray",
+          marginTop: "30px",
+          border: "1px solid #ccc",
+          borderRadius: "10px",
           padding: "20px",
-          minHeight: "150px",
+          minHeight: "250px",
         }}
       >
-        {transcript}
+        <h3>Live Transcript</h3>
+
+        {transcript ? (
+          <p>{transcript}</p>
+        ) : (
+          <p>Click "Start Recording" and begin speaking...</p>
+        )}
       </div>
     </div>
   );
