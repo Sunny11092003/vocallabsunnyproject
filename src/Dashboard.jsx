@@ -173,19 +173,7 @@ function Dashboard() {
       >
         {recording ? "Recording..." : "Start Recording"}
       </button>
-
-      {recording && (
-        <button
-          onClick={stopRecording}
-          style={{
-            padding: "10px 20px",
-            marginRight: "10px",
-          }}
-        >
-          Stop Recording
-        </button>
-      )}
-
+      
       <button
         onClick={logout}
         style={{
